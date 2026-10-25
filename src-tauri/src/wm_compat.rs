@@ -896,6 +896,24 @@ mod tests {
         assert_eq!(parse_extension_probe(None, Some("b@y")), ExtensionProbe::Unknown);
     }
 
+    /// Smoke real (issue #181, verificación exigida en la aprobación):
+    /// requiere sesión de escritorio Linux con D-Bus y `gdbus`/`gnome-extensions`
+    /// disponibles. Correr manualmente: `cargo test --lib -- --ignored --nocapture`.
+    /// Ejercita `detect_wm_info()` completo con sondas reales acotadas por timeout.
+    #[test]
+    #[ignore = "requiere sesión de escritorio Linux con D-Bus y herramientas de sondeo"]
+    fn real_session_tray_diagnostics_smoke() {
+        let info = detect_wm_info();
+        println!(
+            "sesión: wayland={:?} desktop={:?} current={:?}",
+            info.xdg_session_type, info.desktop_session, info.xdg_current_desktop
+        );
+        println!("tray: state={:?} note={:?}", info.surfaces.tray_icon.state, info.surfaces.tray_icon.note);
+        // Contrato mínimo aunque el sondeo falle: la nota nunca queda vacía y
+        // siempre nombra qué se diagnosticó (host o desconocido honesto).
+        assert!(!info.surfaces.tray_icon.note.is_empty());
+    }
+
     #[test]
     fn kde_wayland_is_less_limited_than_gnome() {
         let s = detect_wm_info_from_env(&env(None, Some("wayland"), Some("plasma"), None), tray()).surfaces;
