@@ -478,8 +478,9 @@ fn is_gnome_from_env(env: &Env) -> bool {
 pub fn detect_wm_info() -> WindowManagerInfo {
     let env = Env::from_process();
     // Solo se sondea la bandeja en GNOME: es la única rama que consume el
-    // diagnóstico. Sondas acotadas por timeout y fuera del hilo de UI (los
-    // commands Tauri síncronos corren en el pool; no bloquean el main loop).
+    // diagnóstico. #183 (revisión R3): el trabajo bloqueante sale del hilo de
+    // UI porque el command `get_wm_info` es async y delega en spawn_blocking;
+    // un command Tauri síncrono no garantiza esa separación.
     let tray = if is_gnome_from_env(&env) {
         probe_tray_diagnostics()
     } else {
@@ -555,9 +556,15 @@ fn recommendation(
 }
 
 /// Tauri command expuesto al frontend (`invoke('get_wm_info')`).
+/// #183 (revisión R3): async con `spawn_blocking` — las sondas acotadas
+/// (spawn + espera + drenaje, hasta ~2,25 s nominales) corren en el pool de
+/// tareas bloqueantes y nunca en el hilo de UI; los commands Tauri síncronos
+/// NO garantizan sacar el trabajo del hilo principal.
 #[tauri::command]
-pub fn get_wm_info() -> WindowManagerInfo {
-    detect_wm_info()
+pub async fn get_wm_info() -> WindowManagerInfo {
+    tauri::async_runtime::spawn_blocking(detect_wm_info)
+        .await
+        .expect("la tarea de sondeo no debe fallar antes del cierre de la app")
 }
 
 #[cfg(test)]
