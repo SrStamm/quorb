@@ -59,9 +59,48 @@ Que los fallos de degradación en Linux/GNOME Wayland se informen como tales
       no fue posible (requiere permisos de escritura); la validación y el
       merge son del mantenedor.
 
+### T4 — Revisión del mantenedor en PR #183 (cambios requeridos)
+
+> Revisión del head `ef7d7e7`:
+> https://github.com/egdev6/quorb/pull/183#issuecomment-6400499000
+> Veredicto: **cambios requeridos**; con los tres puntos corregidos,
+> re-revisión. Los atajos y la distinción visual avisos/errores van bien.
+
+- [x] R1. Con host StatusNotifier **presente**, ninguna rama de
+      `gnome_tray_note()` exige ni recomienda instalar/habilitar
+      AppIndicator; la sonda por UUID solo acredita esa implementación como
+      info complementaria. Regresión: host presente + extensión
+      ausente/deshabilitada/desconocida sin consejos contradictorios.
+      El estado pasa a `ok` por presencia de host.
+- [x] R2. `run_with_timeout()` delega en el runner compartido
+      `cli_process::run_inherited_env` (pipeline extraído a
+      `run_pipelined`): deadline que abarque spawn+lectura+limpieza
+      (`timeout + 2 * DRAIN_GRACE`), stdout limitado (`BoundedReader`,
+      64 KiB/stream), `wait()` (reap) tras terminar el árbol completo y en
+      salidas por error. Tests: salida grande, descendiente que retiene
+      stdout, plazo excedido; degradan a `None`/desconocido sin colgar.
+- [x] R3. `get_wm_info()` es command async con sondas en
+      `tauri::async_runtime::spawn_blocking`, cálculo puro
+      (`detect_wm_info`) fuera de la tarea bloqueante; corregido el
+      comentario falso sobre el pool de los commands síncronos.
+
+### T5 — Verificación final de la revisión
+
+- [x] T5.1 Batería completa en verde: `cargo test --locked` (286 ok,
+      2 ignored: smokes reales) · vitest 676/676 (53 archivos) ·
+      `node --test` 225/225 · `tsc --noEmit` · `i18n-inventory --check`
+      (regenerado tras las notas R1).
+- [ ] T5.2 Evidencia publicada en PR #183 (respuesta a la revisión) y push
+      al fork (requiere autorización explícita).
+
 ## Evidencia de commits (rama `fix/181-wayland-degradation-reporting`)
 
 - `f580a98` fix(linux): informar atajos registrados sin efecto global bajo Wayland (#181)
 - `1cbb338` fix(linux): estado de bandeja por host StatusNotifier con sondeo acotado (#181)
 - `6593954` test(linux): smoke real del diagnóstico de bandeja con sondas acotadas (#181)
 - `e6535fd` docs(i18n): regenerar inventario i18n tras #181
+- `3204580` docs(odd): registrar apertura de PR #183 en el doc de tareas (#181)
+- `ac51aac` fix(linux): host StatusNotifier prevalece sobre la extensión (revisión #183 R1)
+- `cfcd567` fix(linux): runner acotado compartido para las sondas (revisión #183 R2)
+- `b2b06ad` fix(linux): get_wm_info async con spawn_blocking (revisión #183 R3)
+- `c83072c` docs(i18n): regenerar inventario i18n tras la revisión de #183 (R1)
