@@ -381,53 +381,33 @@ const APPINDICATOR_UUID: &str = "ubuntu-appindicators@ubuntu.com";
 /// colgar Ajustes; si excede o falla, la sonda degrada a `Unknown`.
 const PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(750);
 
-/// Ejecuta un comando con timeout acotado y devuelve su stdout (`None` si
-/// falla el spawn, sale con error o excede el timeout: en ese caso se mata).
-fn run_with_timeout(mut cmd: std::process::Command, timeout: std::time::Duration) -> Option<String> {
-    use std::io::Read;
-    let mut child = cmd
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .stdin(std::process::Stdio::null())
-        .spawn()
-        .ok()?;
-    let started = std::time::Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) if status.success() => break,
-            Ok(Some(_)) => return None,
-            Ok(None) if started.elapsed() < timeout => std::thread::sleep(std::time::Duration::from_millis(10)),
-            Ok(None) => {
-                let _ = child.kill();
-                return None;
-            }
-            Err(_) => return None,
-        }
-    }
-    let mut out = String::new();
-    // El pipe podría quedar sin EOF si el proceso dejó hijos: capamos por si acaso.
-    child.stdout.take().map(|mut p| p.read_to_string(&mut out).ok());
-    Some(out)
+/// Sonda acotada (issue #183, revisión R2): delega en el runner compartido
+/// `cli_process::run_inherited_env`, que garantiza cota dura total sobre
+/// spawn + espera + reap + drenaje (`timeout + 2 * DRAIN_GRACE`), captura
+/// limitada por stream y terminación del árbol completo (grupo de procesos
+/// propio), con reap del hijo tras la terminación. Devuelve stdout solo si
+/// el proceso salió con código 0; cualquier fallo, salida con error o plazo
+/// excedido degrada a `None` (diagnóstico desconocido), sin colgar Ajustes.
+fn run_with_timeout(program: &str, args: &[&str], timeout: std::time::Duration) -> Option<String> {
+    let output = crate::cli_process::run_inherited_env(program, args, timeout).ok()?;
+    (output.code == 0).then_some(output.stdout)
 }
 
 /// Sonda del host `StatusNotifier`: lista los nombres del bus de sesión vía
 /// `gdbus` y busca `org.kde.StatusNotifierWatcher`. Fallo/timeout → `Unknown`.
 fn probe_status_notifier_host() -> HostProbe {
     let output = run_with_timeout(
-        {
-            let mut c = std::process::Command::new("gdbus");
-            c.args([
-                "call",
-                "--session",
-                "--dest",
-                "org.freedesktop.DBus",
-                "--object-path",
-                "/org/freedesktop/DBus",
-                "--method",
-                "org.freedesktop.DBus.ListNames",
-            ]);
-            c
-        },
+        "gdbus",
+        &[
+            "call",
+            "--session",
+            "--dest",
+            "org.freedesktop.DBus",
+            "--object-path",
+            "/org/freedesktop/DBus",
+            "--method",
+            "org.freedesktop.DBus.ListNames",
+        ],
         PROBE_TIMEOUT,
     );
     parse_host_probe(output.as_deref())
@@ -448,27 +428,13 @@ fn parse_host_probe(output: Option<&str>) -> HostProbe {
 /// deshabilitada si aparece en la lista completa; binario ausente, fallo o
 /// timeout → `Unknown` (nunca un error de diagnóstico se reporta como ausencia).
 fn probe_appindicator_extension() -> ExtensionProbe {
-    let enabled = run_with_timeout(
-        {
-            let mut c = std::process::Command::new("gnome-extensions");
-            c.args(["list", "--enabled"]);
-            c
-        },
-        PROBE_TIMEOUT,
-    );
+    let enabled = run_with_timeout("gnome-extensions", &["list", "--enabled"], PROBE_TIMEOUT);
     if let Some(list) = enabled.as_deref() {
         if list.lines().any(|l| l.trim() == APPINDICATOR_UUID) {
             return ExtensionProbe::Enabled;
         }
     }
-    let all = run_with_timeout(
-        {
-            let mut c = std::process::Command::new("gnome-extensions");
-            c.args(["list"]);
-            c
-        },
-        PROBE_TIMEOUT,
-    );
+    let all = run_with_timeout("gnome-extensions", &["list"], PROBE_TIMEOUT);
     parse_extension_probe(enabled.as_deref(), all.as_deref())
 }
 
@@ -970,6 +936,69 @@ mod tests {
         assert_eq!(parse_extension_probe(Some("a@x"), Some("b@y")), ExtensionProbe::Absent);
         assert_eq!(parse_extension_probe(None, None), ExtensionProbe::Unknown, "fallo → desconocido, no ausente");
         assert_eq!(parse_extension_probe(None, Some("b@y")), ExtensionProbe::Unknown);
+    }
+    /// #183 (revisión R2): el runner debe acotar la captura: una salida mayor
+    /// que MAX_CAPTURE_BYTES se captura acotada y la sonda termina en cota.
+    #[test]
+    #[cfg(unix)]
+    fn run_with_timeout_caps_large_output() {
+        use crate::cli_process;
+        let started = std::time::Instant::now();
+        let out = run_with_timeout(
+            "/bin/sh",
+            &["-c", "yes | head -c 262144"],
+            std::time::Duration::from_secs(5),
+        );
+        assert!(out.is_some(), "la sonda debe completar en cota");
+        assert!(!out.as_ref().unwrap().is_empty());
+        assert!(
+            out.as_ref().unwrap().len() <= cli_process::MAX_CAPTURE_BYTES,
+            "captura acotada, no se lee sin límite: {} bytes",
+            out.as_ref().unwrap().len()
+        );
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(10),
+            "{:?}",
+            started.elapsed()
+        );
+    }
+
+    /// #183 (revisión R2): un descendiente que retiene stdout no puede colgar
+    /// la sonda: el runner termina el árbol completo y drena acotado.
+    #[test]
+    #[cfg(unix)]
+    fn run_with_timeout_descendant_retaining_stdout_does_not_hang() {
+        let started = std::time::Instant::now();
+        let out = run_with_timeout(
+            "/bin/sh",
+            &["-c", "printf 'ok\\n'; (sleep 30) &"],
+            std::time::Duration::from_secs(1),
+        );
+        assert_eq!(out.as_deref(), Some("ok\n"), "stdout del hijo directo: {:?}", out);
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(10),
+            "no debe esperar al nieto (30 s): {:?}",
+            started.elapsed()
+        );
+    }
+
+    /// #183 (revisión R2): un proceso que excede el plazo se mata, se recoge
+    /// con wait y la sonda degrada a `None` dentro de la cota, sin colgar.
+    #[test]
+    #[cfg(unix)]
+    fn run_with_timeout_overrun_degrades_to_none_within_bound() {
+        let started = std::time::Instant::now();
+        let out = run_with_timeout(
+            "/bin/sh",
+            &["-c", "sleep 30"],
+            std::time::Duration::from_millis(500),
+        );
+        assert!(out.is_none(), "plazo excedido → None");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(10),
+            "{:?}",
+            started.elapsed()
+        );
     }
 
     /// Smoke real (issue #181, verificación exigida en la aprobación):
