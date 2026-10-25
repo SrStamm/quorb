@@ -90,8 +90,10 @@ Que los fallos de degradación en Linux/GNOME Wayland se informen como tales
       2 ignored: smokes reales) · vitest 676/676 (53 archivos) ·
       `node --test` 225/225 · `tsc --noEmit` · `i18n-inventory --check`
       (regenerado tras las notas R1).
-- [ ] T5.2 Evidencia publicada en PR #183 (respuesta a la revisión) y push
-      al fork (requiere autorización explícita).
+- [x] T5.2 Evidencia publicada en PR #183 y push al fork:
+      https://github.com/egdev6/quorb/pull/183#issuecomment-6400923246
+      (head `40040ed`, push `ef7d7e7..40040ed`). Re-revisión del mantenedor
+      pendiente.
 
 ## Evidencia de commits (rama `fix/181-wayland-degradation-reporting`)
 
