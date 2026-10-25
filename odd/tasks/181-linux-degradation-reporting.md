@@ -53,11 +53,15 @@ Que los fallos de degradación en Linux/GNOME Wayland se informen como tales
       instalada pero deshabilitada → nota con causa real y consejo de
       habilitar (no reinstalar). La verificación visual de la UI de Ajustes
       queda como paso previo a la PR.
-- [ ] T3.4 PR con plantilla del repo, aceptación y evidencia (requiere
-      autorización explícita).
+- [x] T3.4 PR abierta con plantilla del repo, aceptación y evidencia:
+      https://github.com/egdev6/quorb/pull/183 (head `SrStamm:fix/181-...`,
+      fork creado según la convención del repo). La autoasignación de la PR
+      no fue posible (requiere permisos de escritura); la validación y el
+      merge son del mantenedor.
 
 ## Evidencia de commits (rama `fix/181-wayland-degradation-reporting`)
 
 - `f580a98` fix(linux): informar atajos registrados sin efecto global bajo Wayland (#181)
 - `1cbb338` fix(linux): estado de bandeja por host StatusNotifier con sondeo acotado (#181)
 - `6593954` test(linux): smoke real del diagnóstico de bandeja con sondas acotadas (#181)
+- `e6535fd` docs(i18n): regenerar inventario i18n tras #181
