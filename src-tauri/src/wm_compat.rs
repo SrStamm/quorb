@@ -284,6 +284,20 @@ pub fn detect_wm_info() -> WindowManagerInfo {
     detect_wm_info_from_env(&Env::from_process())
 }
 
+/// ¿La sesión actual es Wayland? Misma semántica que `WindowManagerInfo::is_wayland`
+/// (`WAYLAND_DISPLAY` set, `XDG_SESSION_TYPE=wayland`, token solo-Wayland en
+/// `XDG_CURRENT_DESKTOP` o Hyprland) sin construir el resumen completo. Para
+/// decisiones puntuales como los avisos de atajos bajo Wayland (issue #181).
+pub fn is_wayland_session() -> bool {
+    is_wayland_session_from_env(&Env::from_process())
+}
+
+/// Versión pura e inyectable de `is_wayland_session`: los tests la llaman
+/// directamente sin tocar `std::env` global (thread-safe bajo `cargo test`).
+pub fn is_wayland_session_from_env(env: &Env) -> bool {
+    detect_wm_info_from_env(env).is_wayland
+}
+
 /// Tokens de `XDG_CURRENT_DESKTOP` que solo existen bajo Wayland. GNOME/KDE
 /// corren sobre X11 o Wayland, así que no pertenecen a esta lista.
 fn is_wayland_only_session(token: &str) -> bool {
@@ -416,6 +430,31 @@ mod tests {
         assert_eq!(info.wayland_display, None);
         assert_eq!(info.xdg_session_type, None);
         assert!(!info.is_wayland);
+    }
+
+    /// #181: la detección de sesión Wayland para los avisos de atajos delega en
+    /// la misma semántica que `WindowManagerInfo::is_wayland` (WAYLAND_DISPLAY
+    /// set, XDG_SESSION_TYPE=wayland, token solo-Wayland o Hyprland), sin
+    /// tocar `std::env` global.
+    #[test]
+    fn is_wayland_session_from_env_follows_wm_info_semantics() {
+        // Protocolo Wayland explícito.
+        assert!(is_wayland_session_from_env(&env(Some("wayland-0"), None, None, None)));
+        assert!(is_wayland_session_from_env(&env(None, Some("wayland"), None, None)));
+        // Compositor solo-Wayland en XDG_CURRENT_DESKTOP.
+        assert!(is_wayland_session_from_env(&env(None, None, None, Some("sway"))));
+        // Hyprland es Wayland-only incluso sin más señales.
+        assert!(is_wayland_session_from_env(&env(None, None, Some("hyprland"), None)));
+    }
+
+    #[test]
+    fn is_wayland_session_from_env_rejects_x11_and_empty_strings() {
+        // X11 explícito: no es Wayland aunque el escritorio sea GNOME/KDE.
+        assert!(!is_wayland_session_from_env(&env(None, Some("x11"), Some("gnome"), Some("GNOME"))));
+        assert!(!is_wayland_session_from_env(&env(None, Some("x11"), Some("plasma"), Some("KDE"))));
+        // Env vacío o strings vacíos: nada señalado.
+        assert!(!is_wayland_session_from_env(&env(None, None, None, None)));
+        assert!(!is_wayland_session_from_env(&env(Some(""), Some(""), Some(""), Some(""))));
     }
 
     #[test]
