@@ -284,11 +284,12 @@ fn surfaces_for(
 }
 
 /// Estado de bandeja GNOME (issue #181, ajuste 1): el primario es el host.
-/// Solo host presente **y** extensión habilitada se espera funcionalidad;
-/// nunca se acredita visibilidad del icono, solo disponibilidad del host.
+/// #183 (revisión R1): la presencia del host prevalece independientemente de
+/// la extensión concreta (otra implementación puede proveerlo); nunca se
+/// acredita visibilidad del icono, solo disponibilidad del host.
 fn gnome_tray_state(tray: TrayDiagnostics) -> &'static str {
-    match (tray.host, tray.extension) {
-        (HostProbe::Present, ExtensionProbe::Enabled) => "ok",
+    match tray.host {
+        HostProbe::Present => "ok",
         _ => "limited",
     }
 }
@@ -296,19 +297,23 @@ fn gnome_tray_state(tray: TrayDiagnostics) -> &'static str {
 /// Nota de bandeja GNOME: matriz completa host × extensión (issue #181).
 /// Sin host, nunca se recomienda reinstalar una extensión que ya existe; con
 /// sondeo fallido, se declara desconocido en vez de inferir ausencia.
+/// #183 (revisión R1): con host presente no se exige ni recomienda la
+/// extensión concreta (otra implementación puede proveer el host); la nota
+/// declara qué acredita la sonda por UUID, que solo reconoce la extensión
+/// «AppIndicator» de Ubuntu.
 fn gnome_tray_note(tray: TrayDiagnostics) -> &'static str {
     match (tray.host, tray.extension) {
         (HostProbe::Present, ExtensionProbe::Enabled) => {
-            "Host StatusNotifier detectado y extensión «AppIndicator» habilitada: hay dónde mostrar el icono. Si no aparece, la causa está en la barra, no en la sesión."
+            "Host StatusNotifier detectado en la sesión: hay dónde mostrar el icono. La extensión «AppIndicator» de Ubuntu está habilitada. Solo se acredita la disponibilidad del host, no la visibilidad del icono."
         }
         (HostProbe::Present, ExtensionProbe::Disabled) => {
-            "Se detectó host StatusNotifier, pero la extensión «AppIndicator» está instalada y deshabilitada: habilitala para mostrar el icono."
+            "Host StatusNotifier detectado en la sesión: hay dónde mostrar el icono. La extensión «AppIndicator» de Ubuntu está instalada pero deshabilitada; el host puede provener de otra implementación. Solo se acredita la disponibilidad del host, no la visibilidad del icono."
         }
         (HostProbe::Present, ExtensionProbe::Absent) => {
-            "Se detectó host StatusNotifier, pero la extensión «AppIndicator» no está instalada: sin ella, GNOME no muestra el icono."
+            "Host StatusNotifier detectado en la sesión: hay dónde mostrar el icono. La sonda de extensión solo reconoce la «AppIndicator» de Ubuntu y no la encontró: el host puede provener de otra implementación. Solo se acredita la disponibilidad del host, no la visibilidad del icono."
         }
         (HostProbe::Present, ExtensionProbe::Unknown) => {
-            "Se detectó host StatusNotifier en la sesión: hay dónde mostrar el icono. No se pudo determinar el estado de la extensión «AppIndicator»."
+            "Host StatusNotifier detectado en la sesión: hay dónde mostrar el icono. No se pudo determinar el estado de la extensión «AppIndicator» de Ubuntu: queda desconocido (sonda complementaria); el host puede provener de otra implementación. Solo se acredita la disponibilidad del host, no la visibilidad del icono."
         }
         (HostProbe::Absent, ExtensionProbe::Enabled) => {
             "No se detectó ningún host StatusNotifier en la sesión: no hay dónde mostrar el icono de bandeja. La extensión «AppIndicator» está habilitada, pero la barra activa no provee el host (¿el dock fue reemplazado?)."
@@ -317,7 +322,7 @@ fn gnome_tray_note(tray: TrayDiagnostics) -> &'static str {
             "No se detectó ningún host StatusNotifier en la sesión: no hay dónde mostrar el icono. La extensión «AppIndicator» está instalada pero deshabilitada: habilitala."
         }
         (HostProbe::Absent, ExtensionProbe::Absent) => {
-            "No se detectó ningún host StatusNotifier en la sesión: no hay dónde mostrar el icono. Instalá la extensión «AppIndicator» para proveerlo."
+            "No se detectó ningún host StatusNotifier en la sesión: no hay dónde mostrar el icono. Instalá la extensión «AppIndicator» de Ubuntu para proveerlo."
         }
         (HostProbe::Absent, ExtensionProbe::Unknown) => {
             "No se detectó ningún host StatusNotifier en la sesión: no hay dónde mostrar el icono. No se pudo determinar el estado de la extensión «AppIndicator»."
@@ -877,6 +882,77 @@ mod tests {
         assert!(s.tray_icon.note.contains("deshabilitada"));
         assert!(s.tray_icon.note.contains("habilitala"));
         assert!(!s.tray_icon.note.contains("Instalá"));
+    }
+
+    /// #183 (revisión R1): con host StatusNotifier presente, la presencia del
+    /// host prevalece y la extensión concreta NO puede ser requisito:
+    /// otra implementación puede estar proveyéndolo. Sin consejos de
+    /// habilitar ni instalar, y sin atribuir la ausencia del icono a la
+    /// extensión.
+    #[test]
+    fn gnome_wayland_host_present_extension_disabled_never_advises_enabling() {
+        let s = detect_wm_info_from_env(
+            &env(Some("wayland-0"), Some("wayland"), Some("gnome"), None),
+            TrayDiagnostics { host: HostProbe::Present, extension: ExtensionProbe::Disabled },
+        )
+        .surfaces;
+        assert_eq!(s.tray_icon.state, "ok");
+        assert!(s.tray_icon.note.contains("Host StatusNotifier detectado"));
+        assert!(s.tray_icon.note.contains("deshabilitada"));
+        assert!(
+            !s.tray_icon.note.contains("habilitala") && !s.tray_icon.note.contains("Instalá"),
+            "con host presente no se recomienda actuar sobre la extensión: {}",
+            s.tray_icon.note
+        );
+    }
+
+    /// #183 (revisión R1): con host presente y extensión «no instalada», la
+    /// nota describe exactamente qué acredita la sonda por UUID (solo la
+    /// extensión de Ubuntu) sin afirmar que GNOME no muestra el icono.
+    #[test]
+    fn gnome_wayland_host_present_extension_absent_reports_probe_scope() {
+        let s = detect_wm_info_from_env(
+            &env(Some("wayland-0"), Some("wayland"), Some("gnome"), None),
+            TrayDiagnostics { host: HostProbe::Present, extension: ExtensionProbe::Absent },
+        )
+        .surfaces;
+        assert_eq!(s.tray_icon.state, "ok");
+        assert!(s.tray_icon.note.contains("Host StatusNotifier detectado"));
+        assert!(
+            !s.tray_icon.note.contains("sin ella"),
+            "no atribuye la visibilidad a la extensión concreta: {}",
+            s.tray_icon.note
+        );
+        assert!(
+            !s.tray_icon.note.contains("Instalá") && !s.tray_icon.note.contains("habilitala"),
+            "con host presente no se recomienda instalar la extensión: {}",
+            s.tray_icon.note
+        );
+        assert!(
+            s.tray_icon.note.contains("otra implementación"),
+            "declara que el host puede provener de otra implementación: {}",
+            s.tray_icon.note
+        );
+    }
+
+    /// #183 (revisión R1): con host presente y sonda de extensión fallida,
+    /// el host sigue prevaleciendo; la extensión queda como desconocida sin
+    /// consejos contradictorios.
+    #[test]
+    fn gnome_wayland_host_present_extension_unknown_still_claims_host() {
+        let s = detect_wm_info_from_env(
+            &env(Some("wayland-0"), Some("wayland"), Some("gnome"), None),
+            TrayDiagnostics { host: HostProbe::Present, extension: ExtensionProbe::Unknown },
+        )
+        .surfaces;
+        assert_eq!(s.tray_icon.state, "ok");
+        assert!(s.tray_icon.note.contains("Host StatusNotifier detectado"));
+        assert!(s.tray_icon.note.contains("desconocido"));
+        assert!(
+            !s.tray_icon.note.contains("Instalá") && !s.tray_icon.note.contains("habilitala"),
+            "sin consejos contradictorios: {}",
+            s.tray_icon.note
+        );
     }
 
     /// #181: parseo puro de las sondas (matriz del ajuste 2), sin procesos.
