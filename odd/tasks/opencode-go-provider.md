@@ -170,8 +170,11 @@ roadmap. La asignación no autoriza merge ni release.
       con 4 notas no bloqueantes incorporadas (ver Log L8).
 - [x] T7 · S1: backend `opencode_go.rs` + tests de parseo/estados/composición. 15 tests propios; módulo
       registrado en `mod.rs` en el mismo commit (nota 4).
-- [ ] T8 · S2+S3: resto de config/secretos TS (`widget-refresh.ts`, `accounts.ts`), wiring de UI,
-      pestaña, sección Settings, AccountEditor, order, logo, README. Commit `feat(providers)`.
+- [x] T8 · S2+S3: config, secretos, wiring, tipos, UI, logo, README. Commit `0aec041` (12 archivos,
+      +112/−18). Notas: `accountReady` con rama `opencode_go` (exigida por el plan; la ausencia en zai es
+      un gap preexistente), monograma explícito `OC` (Grok usa `grok.svg` en este repo, no monograma),
+      `OFFICIAL_USAGE_URL → https://opencode.ai/console` según S3 aprobado. Verificado: npm test 225 OK,
+      typecheck limpio, inventario i18n OK, cargo test 322 OK, fmt/clippy limpios.
 - [ ] T9 · S4+verificación: suite completa (`npm test`, `typecheck`, `cargo test`, fmt, i18n inventory);
       evidencia para la PR. Abrir PR requiere autorización explícita.
 
@@ -216,3 +219,8 @@ tests (nota 3 del mantenedor).
   parcial, un único Warning combinado) + 15 tests; registro en `providers/mod.rs` (`fetch_all`, `fetch_one`,
   `fetch_account`). Commit `1191259`; `cargo test` 322 en verde, `cargo fmt --check` OK, clippy limpio
   en el archivo nuevo.
+- L10 (2026-10-28): T8 implementada por writer delegado en dos pasadas (la primera se detuvo por un gap
+  de superficie en `types.ts`/`settings-visibility.ts` del trabajo previo incompleto; aprobado completarlas
+  siguiendo el patrón z.ai 7043a84). S2 restante (`widget-refresh`, `accounts.ts`) + S3 completo (pestaña,
+  sección Settings, AccountEditor, `OFFICIAL_USAGE_URL`, monograma `OC`, READMEs). Commit `0aec041`.
+  El `it.each` de settings-visibility ya cubre y pasa la entrada nueva (toggle de visibilidad funcional).
