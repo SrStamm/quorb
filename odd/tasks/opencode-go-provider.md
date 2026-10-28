@@ -177,6 +177,22 @@ roadmap. La asignación no autoriza merge ni release.
       typecheck limpio, inventario i18n OK, cargo test 322 OK, fmt/clippy limpios.
 - [x] T9 · S4+verificación: suite completa en verde (7/7, ver L12); evidencia preparada para la PR.
       Abrir PR requiere autorización explícita.
+- [x] T10 · **BLOCKER del review egdev6 #201**: validar `resetsAt` con `chrono::parse_from_rfc3339`
+      (patrón cursor/grok); inválido → porcentaje conservado, `resets_at: None`, aviso; + test con
+      strings no interpretable. Commit `cd70933`.
+- [x] T11 · Refuerzo de cobertura S4 (mismo review): caso `percent: 100`; JSON vacío/renombrado;
+      aserciones estrictas en `rate_limited_window_warning_keeps_meters`,
+      `percent_validation_bounds` y `unknown_status_or_missing_status`; extraído `build_report`
+      del tramo final de `fetch` y verificado el `Status::Warning` final sin red; corregida la
+      procedencia del comentario del 403 (documental, no sintético). Commit `cd70933`.
+- [x] T12 · Copy (sugerencias del review): avisos con la etiqueta del medidor (no claves internas
+      `rolling`/`monthly`); «Límite de uso alcanzado en…» para rate-limited; pestaña unificada a
+      «ciclo de facturación» (Settings.tsx) + tests actualizados para afirmar por etiqueta.
+      Commits `cd70933` (Rust) y `82b8613` (Settings.tsx).
+- [x] T13 · Verificación 7/7 post-feedback: cargo test 326 OK (19 del módulo, +4), fmt OK, clippy
+      limpio en `opencode_go.rs`, npm test 715 vitest + 240 node OK, typecheck limpio, inventario
+      i18n `--check` OK (ver L14). Commits de unidad de trabajo: `cd70933`, `82b8613`; doc en
+      commit propio. Push y respuesta en la PR quedan con el usuario.
 
 ## Estimación
 
@@ -241,6 +257,20 @@ tests (nota 3 del mantenedor).
   inventario). Resuelto con `acae551`: React 770/915 → 776/930; `i18n-inventory.mjs --check` en verde.
   Branch final: 6 commits, diff three-dot 15 archivos +770/−12. La PR abre solo con autorización
   explícita; el comentario de evidencia con captura lo publica el usuario en #187.
+- L14 (2026-10-28): **Feedback del review del mantenedor en PR #201 incorporado** (T10–T13).
+  Cambios: (1) bloqueante de `resetsAt` — validación RFC3339 con `chrono` (patrón cursor/grok),
+  inválido/ausente conservan el porcentaje, dejan reinicio desconocido y emiten aviso (criterio 6),
+  test-first con RED observado; (2) persistencia de avisos revisada — usan la etiqueta visible del
+  medidor (label_of) y «Límite de uso alcanzado en…» para rate-limited; (3) `build_report` extraída
+  del tramo final de `fetch` para verificar el Estado final sin red (nota 2 del plan); (4) cobertura
+  S4 ampliada y aserciones más estrictas (percent 100, JSON vacío/renombrado con composición de las
+  tres ventanas, medidores conservados/no creados, ambas ventanas diagnósticas); (5) pestaña
+  unificada a «ciclo de facturación»; (6) comentario del 403 con procedencia documental. el guard
+  de informe vacío quedó documentado como rama defensiva inalcanzable hoy.
+  Verificación 7/7: cargo test 326 OK (19 del módulo), fmt OK, clippy limpio en el archivo,
+  npm test 715 vitest + 240 node OK, typecheck limpio, inventario i18n `--check` OK.
+  Nota de verificación: las suites corridas inline con salida acotada (tail/counts); el próximo
+  ciclo pasa por el verificador read-only. Commits `cd70933` y `82b8613`.
 - L13 (2026-10-28): **PR #201 abierta** con autorización explícita del usuario:
   https://github.com/egdev6/quorb/pull/201 (`SrStamm:feat/opencode-go` → `egdev6:main`, título
   `feat(providers): provider OpenCode Go con cuotas 5 h/semana/ciclo (#187)`, body según plantilla con
