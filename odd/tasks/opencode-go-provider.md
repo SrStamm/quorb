@@ -175,8 +175,8 @@ roadmap. La asignación no autoriza merge ni release.
       un gap preexistente), monograma explícito `OC` (Grok usa `grok.svg` en este repo, no monograma),
       `OFFICIAL_USAGE_URL → https://opencode.ai/console` según S3 aprobado. Verificado: npm test 225 OK,
       typecheck limpio, inventario i18n OK, cargo test 322 OK, fmt/clippy limpios.
-- [ ] T9 · S4+verificación: suite completa (`npm test`, `typecheck`, `cargo test`, fmt, i18n inventory);
-      evidencia para la PR. Abrir PR requiere autorización explícita.
+- [x] T9 · S4+verificación: suite completa en verde (7/7, ver L12); evidencia preparada para la PR.
+      Abrir PR requiere autorización explícita.
 
 ## Estimación
 
@@ -224,3 +224,17 @@ tests (nota 3 del mantenedor).
   siguiendo el patrón z.ai 7043a84). S2 restante (`widget-refresh`, `accounts.ts`) + S3 completo (pestaña,
   sección Settings, AccountEditor, `OFFICIAL_USAGE_URL`, monograma `OC`, READMEs). Commit `0aec041`.
   El `it.each` de settings-visibility ya cubre y pasa la entrada nueva (toggle de visibilidad funcional).
+- L11 (2026-10-28): **Smoke en vivo del usuario con su API key real de Go: OK** — el orbe muestra las
+  tres ventanas con datos sin problemas (criterio de aceptación 1 verificado funcionalmente fuera de
+  los tests). Captura de evidencia visual: la aporta el usuario en el comentario de evidencia.
+- L12 (2026-10-28): **T9 cerrada — verificación final 7/7 PASS** (verificador read-only sobre HEAD
+  `df35ca8`): `cargo test` 322 OK · `cargo fmt --check` OK · clippy sin warnings en `opencode_go.rs`
+  (27 preexistentes en otros archivos) · `npm test` 688 vitest + 225 node OK · `typecheck` limpio ·
+  inventario i18n regenerado y commiteado (`58bcaee`; React 610/762, Rust 347/421) · inventario git:
+  5 commits sobre el punto de branch, diff real three-dot **15 archivos, +766/−20** (el two-dot de 46
+  archivos incluía avances de main).
+- **Pendiente antes de PR**: `origin/main` avanzó 4 commits (#186 inventario i18n con contrato de
+  drift en CI, #195/#199 migración i18n de Ajustes, #200 release 0.8.0) — rebase sobre main y re-ejecutar
+  la verificación completa con el script vigente (riesgo i18n previsto). Sin entrar en #199 (secciones
+  no-proveedor), no debería chocar con esta UI. El tamaño real del diff se decide con el mantenedor
+  (nota 3); los ~766 añadidos incluyen doc ODD +226 e inventario regenerado ~504.
