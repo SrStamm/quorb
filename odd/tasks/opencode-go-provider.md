@@ -241,3 +241,11 @@ tests (nota 3 del mantenedor).
   inventario). Resuelto con `acae551`: React 770/915 → 776/930; `i18n-inventory.mjs --check` en verde.
   Branch final: 6 commits, diff three-dot 15 archivos +770/−12. La PR abre solo con autorización
   explícita; el comentario de evidencia con captura lo publica el usuario en #187.
+- L13 (2026-10-28): **PR #201 abierta** con autorización explícita del usuario:
+  https://github.com/egdev6/quorb/pull/201 (`SrStamm:feat/opencode-go` → `egdev6:main`, título
+  `feat(providers): provider OpenCode Go con cuotas 5 h/semana/ciclo (#187)`, body según plantilla con
+  issue, plan v2 y evidencia enlazados). Branch pusheda al fork. Label `type:feature` y assignee NO
+  aplicados: 403 — SrStamm sin permiso de triage en el upstream (precedente #183/#184: los etiqueta
+  el mantenedor). CI en curso al abrir: secrets-scan PASS; resto pending. En #187 el usuario publicó
+  el comentario de evidencia con captura (issuecomment-6473938160). El estado de la PR (merge, labels,
+  revisiones) queda en manos del mantenedor.
