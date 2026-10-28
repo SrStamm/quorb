@@ -233,8 +233,11 @@ tests (nota 3 del mantenedor).
   inventario i18n regenerado y commiteado (`58bcaee`; React 610/762, Rust 347/421) · inventario git:
   5 commits sobre el punto de branch, diff real three-dot **15 archivos, +766/−20** (el two-dot de 46
   archivos incluía avances de main).
-- **Pendiente antes de PR**: `origin/main` avanzó 4 commits (#186 inventario i18n con contrato de
-  drift en CI, #195/#199 migración i18n de Ajustes, #200 release 0.8.0) — rebase sobre main y re-ejecutar
-  la verificación completa con el script vigente (riesgo i18n previsto). Sin entrar en #199 (secciones
-  no-proveedor), no debería chocar con esta UI. El tamaño real del diff se decide con el mantenedor
-  (nota 3); los ~766 añadidos incluyen doc ODD +226 e inventario regenerado ~504.
+- **Rebase hecho (2026-10-28)** sobre `origin/main` (#186/#195/#199/#200) con conflicto solo en
+  `docs/i18n-inventory.md`. Re-verificación completa post-rebase: todo verde (cargo test 322, fmt,
+  clippy sin warnings en `opencode_go.rs` y sin warnings en los archivos tocados, npm test 715 vitest
+  + 240 node, typecheck, spot-check de Settings.tsx intacta) con un bloqueo: **drift del inventario
+  i18n** detectado por el contrato CI de #186 (los 6 textos React nuevos de la UI no estaban en el
+  inventario). Resuelto con `acae551`: React 770/915 → 776/930; `i18n-inventory.mjs --check` en verde.
+  Branch final: 6 commits, diff three-dot 15 archivos +770/−12. La PR abre solo con autorización
+  explícita; el comentario de evidencia con captura lo publica el usuario en #187.
