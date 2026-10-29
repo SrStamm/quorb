@@ -204,3 +204,6 @@ tests DOM diferidos (jsdom/happy-dom).
 - [ ] Menores: fallback a `compositor` solo Linux; comentario `dragMode()`
   sobre `storedDragMode`; comentario huérfano en `Widget.tsx` ~219; enlace de
   aprobación en la descripción.
+- [x] (5) Descope: `odd/tasks/184-rustfmt-ci-format-gate.md` fuera de la PR
+  (abandon de `review-27bd42743acae960` autorizado por el usuario y commit de
+  remoción; review nativo relanzado sobre el candidato corregido).
