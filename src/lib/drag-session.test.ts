@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { currentDragMode, dragMode, resetDragMode, setDragMode } from './drag-session';
+import { currentDragMode, dragMode, fallbackDragMode, resetDragMode, setDragMode } from './drag-session';
 
 describe('dragMode', () => {
   it('decides by effective GDK backend, not session type', () => {
@@ -31,6 +31,19 @@ describe('dragMode', () => {
     expect(decision.allowSnap).toBe(decision.mode === 'native');
     expect(decision.allowPersist).toBe(snap);
     expect(decision.allowPersist).toBe(persist);
+  });
+});
+
+describe('fallbackDragMode (detection failure, #180 review minor)', () => {
+  // The maintainer review of #210: if `get_wm_info` fails, the 'compositor'
+  // degradation must not reach Windows/macOS, where a one-off probe failure
+  // would silently remove the only drag the platform has (the magnet). Linux
+  // keeps the no-touch gesture because the native pipeline could corrupt
+  // config.json in unknown conditions.
+  it('degrades to compositor on Linux only', () => {
+    expect(fallbackDragMode('linux')).toBe('compositor');
+    expect(fallbackDragMode('windows')).toBe('native');
+    expect(fallbackDragMode('macos')).toBe('native');
   });
 });
 

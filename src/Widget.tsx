@@ -25,7 +25,7 @@ import { accountTags } from './lib/accounts';
 import { clipSurfaceSafely, measureSurfaceClip } from './lib/surface-clip';
 import { peekRect, usesPeekWindow, waitForViewport, watchPreparation } from './lib/auto-hide';
 import { useDockReveal } from './lib/useDockReveal';
-import { currentDragMode, dragMode, resetDragMode, setDragMode } from './lib/drag-session';
+import { currentDragMode, dragMode, fallbackDragMode, resetDragMode, setDragMode } from './lib/drag-session';
 import { detectWindowManager } from './lib/wm-detect';
 import { t } from './i18n';
 import { localeFrom } from './i18n/use-locale';
@@ -226,11 +226,6 @@ export function Widget() {
   const openPeakRef = useRef<() => void>(() => {});
   const dragWork = useRef<Promise<void>>(Promise.resolve());
   const dragMounted = useRef(true);
-  // #180: drag strategy for this session, decided ONCE at startup. The
-  // decision lives in the module-level store in `src/lib/drag-session.ts`
-  // (observable/resettable by tests and across re-mounts), not in a local
-  // ref. `null` = decision not resolved yet: until it is, the grip starts no
-  // drag. Once set: 'native' or 'compositor'.
 
   const edge: Edge = config && isEdge(config.dockEdge) ? config.dockEdge : 'top';
   const offset = config?.dockOffset ?? 0.5;
@@ -856,9 +851,11 @@ export function Widget() {
   //   session is precisely the corruption this issue fixes, so the drag is
   //   BLOCKED instead of guessed. Detection is a fast startup command, so
   //   blocking until it resolves is deterministic and imperceptible.
-  // - If detection fails, fall back to 'compositor': that behavior does NO
-  //   harm — the compositor gesture cannot touch config.json, whereas the
-  //   native pipeline could (see rationale in src/lib/drag-session.ts).
+  // - If detection fails, the fallback is Linux-only (#210 review minor):
+  //   Linux degrades to 'compositor' because the gesture cannot touch
+  //   config.json, while Windows/macOS keep 'native' so a one-off probe
+  //   failure never removes their magnet (see fallbackDragMode in
+  //   src/lib/drag-session.ts).
   // - On unmount the store is cleared so a re-mounted widget re-detects
   //   instead of inheriting a stale decision.
   useEffect(() => {
@@ -872,7 +869,7 @@ export function Widget() {
         setDragMode(dragMode(info.displayBackend).mode);
       })
       .catch(() => {
-        if (!disposed) setDragMode('compositor');
+        if (!disposed) setDragMode(fallbackDragMode(osFromUA(navigator.userAgent)));
       });
     return () => {
       disposed = true;
