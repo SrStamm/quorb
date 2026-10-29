@@ -259,3 +259,4 @@ tests DOM diferidos (jsdom/happy-dom).
   `b69c671`). Evidencia con capturas (4 bordes + aviso con contenedor
   visible) publicada por el usuario en issue #180, comentario 6509379529.
   Restante para integrar: force-push del fork (decisión del usuario).
+- [x] Force-push al fork completado (2026-10-29, ejecutado por el usuario): PR #210 apuntando a `5cf41b7` (e148f6a...5cf41b7, forced update). Los 5 puntos del review y los 4 menores quedaron cerrados y verificados; pendiente solo la re-revision del mantenedor.
