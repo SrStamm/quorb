@@ -25,6 +25,8 @@ import { accountTags } from './lib/accounts';
 import { clipSurfaceSafely, measureSurfaceClip } from './lib/surface-clip';
 import { peekRect, usesPeekWindow, waitForViewport, watchPreparation } from './lib/auto-hide';
 import { useDockReveal } from './lib/useDockReveal';
+import { dragMode, type DragMode } from './lib/drag-session';
+import { detectWindowManager, type WindowManagerInfo } from './lib/wm-detect';
 import { t } from './i18n';
 import { localeFrom } from './i18n/use-locale';
 import { StripFallback } from './components/StripFallback';
@@ -224,6 +226,11 @@ export function Widget() {
   const openPeakRef = useRef<() => void>(() => {});
   const dragWork = useRef<Promise<void>>(Promise.resolve());
   const dragMounted = useRef(true);
+  // #180: drag strategy for this session, decided ONCE at startup.
+  // `null` = decision not resolved yet: until it is, the grip starts no drag
+  // (default recorded at the decision effect below). Once set: 'native' or
+  // 'compositor'.
+  const dragModeRef = useRef<DragMode | null>(null);
 
   const edge: Edge = config && isEdge(config.dockEdge) ? config.dockEdge : 'top';
   const offset = config?.dockOffset ?? 0.5;
@@ -826,6 +833,38 @@ export function Widget() {
       window.clearInterval(interval);
     };
   }, [hovered, presenceRef]);
+  // #180: drag strategy decision, fetched ONCE at mount (single fast
+  // `get_wm_info` command). Two deterministic defaults, both recorded here:
+  // - While the decision is unresolved (`dragModeRef.current === null`) the
+  //   grip does nothing: starting the old delta pipeline on a Wayland
+  //   session is precisely the corruption this issue fixes, so the drag is
+  //   BLOCKED instead of guessed. Detection is a fast startup command, so
+  //   blocking until it resolves is deterministic and imperceptible.
+  // - If detection fails, fall back to 'compositor': that behavior does NO
+  //   harm — the compositor gesture cannot touch config.json, whereas the
+  //   native pipeline could (see rationale in src/lib/drag-session.ts).
+  useEffect(() => {
+    let disposed = false;
+    detectWindowManager()
+      .then((info) => {
+        if (disposed) return;
+        // `displayBackend` ships in the get_wm_info response in wm_compat.rs
+        // (WU4, serde camelCase), but the TS mirror in src/lib/wm-detect.ts
+        // does not declare it yet (WU5 will, with its Settings row), so read
+        // it defensively: anything other than the two known backends is
+        // treated as detection failure and falls back to 'compositor'.
+        const backend = (info as WindowManagerInfo & { displayBackend?: unknown }).displayBackend;
+        dragModeRef.current =
+          backend === 'x11' || backend === 'wayland' ? dragMode(backend).mode : 'compositor';
+      })
+      .catch(() => {
+        if (!disposed) dragModeRef.current = 'compositor';
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
   useEffect(() => {
     dragMounted.current = true;
     return () => {
@@ -859,7 +898,25 @@ export function Widget() {
 
   const onGripDown = (e: PointerEvent<HTMLSpanElement>) => {
     if (e.button !== 0 || !geo || !dragMounted.current) return;
+    // #180: until the startup decision is known the grip does nothing (see
+    // the decision effect above for both defaults).
+    if (dragModeRef.current == null) return;
     e.preventDefault();
+    if (dragModeRef.current === 'compositor') {
+      // Compositor branch: the drag is delegated to the compositor via the
+      // xdg-shell move gesture. startDragging() consumes the pointerdown
+      // serial itself, so we set up no pointer capture and no `drag.current`
+      // delta state: under xdg-shell the client has no absolute position to
+      // delta from (see onGripUp for the release-side counterpart).
+      setDragging(true);
+      cancelTimers();
+      setHovered(null);
+      getCurrentWindow().startDragging().catch((err) => {
+        setError(String(err));
+        setDragging(false);
+      });
+      return;
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
     if (drag.current) cancelAnimationFrame(drag.current.raf);
     cancelTimers();
@@ -893,6 +950,10 @@ export function Widget() {
   };
 
   const onGripMove = (e: PointerEvent<HTMLSpanElement>) => {
+    // #180: in compositor mode the compositor moves the window during the
+    // gesture, so this is a no-op — early return before any arithmetic or
+    // rAF work. The native branch below keeps today's pipeline untouched.
+    if (dragModeRef.current === 'compositor') return;
     const d = drag.current;
     if (!d?.start || d.ending || e.pointerId !== d.pointerId) return;
     const current = () => dragMounted.current && drag.current === d;
@@ -908,6 +969,18 @@ export function Widget() {
   };
 
   const onGripUp = async (e: PointerEvent<HTMLSpanElement>) => {
+    // #180: in compositor mode the compositor owns the grab and the final
+    // position, so this is minimal cleanup only — mirror of the `finally`
+    // below, minus the native snap/persist work: no outerPosition(), no
+    // nearestEdge(), no patchConfig(), no resolveGeo(). In this mode we set
+    // up no pointer capture, no rAF and no `drag.current`, so there is
+    // genuinely nothing else to release; a persisted edge computed from
+    // untrustworthy coordinates would corrupt the config.json that X11
+    // sessions also read.
+    if (dragModeRef.current === 'compositor') {
+      setDragging(false);
+      return;
+    }
     const d = drag.current;
     if (!d || d.ending || e.pointerId !== d.pointerId) return;
     d.ending = true;
