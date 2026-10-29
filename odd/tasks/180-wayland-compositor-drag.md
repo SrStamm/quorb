@@ -177,3 +177,30 @@ tests DOM diferidos (jsdom/happy-dom).
   integración XWayland), y el cableado lo cubre el smoke manual exigido.
 - Los mensajes de commit de esta rama están en español (convención del
   repo), decisión confirmada por el contribuidor.
+
+## Revisión del mantenedor (PR #210, changes requested 2026-10-29)
+
+- Review del mantenedor con 5 cambios: (1) rebase sobre `f71039b`; (2) una sola
+  detección del backend GDK; (3) bug `dragging` pegado en compositor (salida
+  robusta si no llega el pointerup; probar apertura del panel post-soltura);
+  (4) condicionales a #205 (nota X11, 4 capturas GDK_BACKEND=x11, doc de la
+  variable); (5) descope de `odd/tasks/184-rustfmt-ci-format-gate.md`.
+- [x] (1) Rebase hecho sobre `f71039b` con backup `backup/fix-180-pr210-rebase`
+  (=`e148f6a` pre-rebase). Conflictos: `Cargo.toml` (gtk 0.18 duplicado) y
+  `docs/i18n-inventory.md` (regenerado con `node scripts/i18n-inventory.mjs`,
+  `--check` verde).
+- [x] (2) Unificación: la sonda WU1 en `setup` (commit `4f48f5a`) quedó
+  eliminada como fuente duplicada; la fuente única es `widget_placement`:
+  `display_kind()` (OnceLock, sólo hilo de UI) clasifica X11/Wayland/Unknown,
+  `transport()` y `wm_compat::get_wm_info` derivan de esa misma caché. El
+  command ahora sonda vía `display_backend_on_ui(&window)` (no spawn_blocking)
+  y `Unknown`/fallo degrada al fallback por env `display_backend_from_env`
+  (precedencia WU4 intacta). Verificación post-rebase: cargo 367 passed /
+  3 ignored, cargo fmt --check limpio, vitest src 762 passed (0 failed),
+  node --test scripts 0 fail, typecheck 0, i18n-inventory --check verde.
+- [ ] (3) Bug `dragging` compositor: verificar `npm run app:dev` y
+  `GDK_BACKEND=x11 npm run app:dev` (acordado con el usuario); añadir salida
+  robusta si el `pointerup` no llega.
+- [ ] Menores: fallback a `compositor` solo Linux; comentario `dragMode()`
+  sobre `storedDragMode`; comentario huérfano en `Widget.tsx` ~219; enlace de
+  aprobación en la descripción.
