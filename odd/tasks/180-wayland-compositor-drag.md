@@ -217,3 +217,18 @@ tests DOM diferidos (jsdom/happy-dom).
 - Sin caja translúcida del contenedor en general; visible SOLO mientras se
   muestra el aviso de API_KEY no aplicada para el proveedor detectado:
   nota de evidencia concreta para las capturas pedidas (punto 4 del review).
+
+## Validación manual del usuario post-rebase, 2ª ronda (2026-10-29)
+
+- Punto 3 (bug `dragging` pegado): NO reproducible — drag e inmediata apertura
+  del panel de detalle en varias repeticiones (usuario, Wayland nativo).
+  Decisión del review pedía fix sólo si el `pointerup` no llegaba; queda
+  documentado como no reproducible + verificación pendiente de más intentos.
+- Aviso de proveedor sin credencial NO configurada: en Wayland nativo NO
+  aparece el error que sí aparece con `GDK_BACKEND=x11`. Hipótesis alineada
+  con la superficie `windowPositioning` limitada: la ventana/mensaje que lo
+  muestra se posiciona por X11 (`set_position` sin efecto en native Wayland,
+  H1 del smoke #107) — base-only, atribución a confirmar con el mantenedor.
+- El contenedor visible bloquea clicks detrás de él fuera de la pila:
+  limitación declarada de click-through (documentada en Ajustes), territorio
+  #179/#205, preexistente.
