@@ -232,3 +232,11 @@ tests DOM diferidos (jsdom/happy-dom).
 - El contenedor visible bloquea clicks detrás de él fuera de la pila:
   limitación declarada de click-through (documentada en Ajustes), territorio
   #179/#205, preexistente.
+- [x] Red de seguridad del punto 3 agregada (commit posterior, decisión del
+  usuario): efecto en `src/Widget.tsx` que en modo compositor limpia
+  `setDragging(false)` al llegar un `pointermove` con `buttons === 0`
+  (señal de soltura que la webview sí recibe tras terminar el grab). Sólo
+  compositor: el pipeline nativo conserva su soltura en `onGripUp`. Verificación:
+  typecheck 0 + vitest 762/61 verde (RED inaplicable — sin entorno DOM,
+  decision jsdom/happy-dom sigue diferida al mantenedor); revalidación manual
+  pendiente del usuario.
