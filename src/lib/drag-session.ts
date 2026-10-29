@@ -28,6 +28,33 @@ export interface DragDecision {
  * unreliable coordinates could corrupt the shared config.json that X11
  * sessions also read — so neither snap nor persistence runs there.
  */
+/**
+ * Module-level decision store for the CURRENT session's drag mode.
+ *
+ * A widget-local `useRef` cannot be observed or reset by outside code: the SSR
+ * test harness (`renderToStaticMarkup`) runs no React effects, so a ref stays
+ * `null` forever and every simulated grip is blocked; and on a re-mounted
+ * widget a ref either leaks a stale decision or re-detects from scratch with
+ * no observable state in between. A module store is observable by tests and
+ * resettable on unmount, and the decision is still fetched exactly once per
+ * mount via `get_wm_info` (see the decision effect in `src/Widget.tsx`).
+ *
+ * `null` = unresolved: the grip must NOT start any drag yet (both defaults
+ * from the mount effect). Otherwise 'native' or 'compositor', as decided by
+ * `dragMode()` for the effective GDK backend (or the safe fallback).
+ */
+let storedDragMode: DragMode | null = null;
+
+export const setDragMode = (mode: DragMode): void => {
+  storedDragMode = mode;
+};
+
+export const currentDragMode = (): DragMode | null => storedDragMode;
+
+export const resetDragMode = (): void => {
+  storedDragMode = null;
+};
+
 export function dragMode(backend: DisplayBackend): DragDecision {
   if (backend === 'x11') {
     return { mode: 'native', allowSnap: true, allowPersist: true };

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { dragMode } from './drag-session';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { currentDragMode, dragMode, resetDragMode, setDragMode } from './drag-session';
 
 describe('dragMode', () => {
   it('decides by effective GDK backend, not session type', () => {
@@ -31,5 +31,41 @@ describe('dragMode', () => {
     expect(decision.allowSnap).toBe(decision.mode === 'native');
     expect(decision.allowPersist).toBe(snap);
     expect(decision.allowPersist).toBe(persist);
+  });
+});
+
+describe('module decision store', () => {
+  // The store is module-global, so every test starts from the unresolved
+  // default to stay independent of execution order.
+  beforeEach(() => {
+    resetDragMode();
+  });
+
+  it('starts unresolved: currentDragMode() is null and the grip would be blocked', () => {
+    expect(currentDragMode()).toBeNull();
+  });
+
+  it('records the mount-effect decision', () => {
+    setDragMode(dragMode('x11').mode);
+    expect(currentDragMode()).toBe('native');
+    setDragMode(dragMode('wayland').mode);
+    expect(currentDragMode()).toBe('compositor');
+    setDragMode('compositor'); // Detection-failure fallback path.
+    expect(currentDragMode()).toBe('compositor');
+  });
+
+  it('resetDragMode returns to the unresolved state', () => {
+    setDragMode('native');
+    expect(currentDragMode()).toBe('native');
+    resetDragMode();
+    expect(currentDragMode()).toBeNull();
+  });
+
+  it('is pure with respect to dragMode(): the decision function stays stateless', () => {
+    setDragMode('compositor');
+    expect(dragMode('x11')).toEqual(dragMode('x11'));
+    expect(dragMode('x11').mode).toBe('native');
+    expect(dragMode('wayland').mode).toBe('compositor');
+    expect(currentDragMode()).toBe('compositor');
   });
 });

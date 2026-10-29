@@ -25,7 +25,7 @@ import { accountTags } from './lib/accounts';
 import { clipSurfaceSafely, measureSurfaceClip } from './lib/surface-clip';
 import { peekRect, usesPeekWindow, waitForViewport, watchPreparation } from './lib/auto-hide';
 import { useDockReveal } from './lib/useDockReveal';
-import { dragMode, type DragMode } from './lib/drag-session';
+import { currentDragMode, dragMode, resetDragMode, setDragMode } from './lib/drag-session';
 import { detectWindowManager } from './lib/wm-detect';
 import { t } from './i18n';
 import { localeFrom } from './i18n/use-locale';
@@ -226,11 +226,11 @@ export function Widget() {
   const openPeakRef = useRef<() => void>(() => {});
   const dragWork = useRef<Promise<void>>(Promise.resolve());
   const dragMounted = useRef(true);
-  // #180: drag strategy for this session, decided ONCE at startup.
-  // `null` = decision not resolved yet: until it is, the grip starts no drag
-  // (default recorded at the decision effect below). Once set: 'native' or
-  // 'compositor'.
-  const dragModeRef = useRef<DragMode | null>(null);
+  // #180: drag strategy for this session, decided ONCE at startup. The
+  // decision lives in the module-level store in `src/lib/drag-session.ts`
+  // (observable/resettable by tests and across re-mounts), not in a local
+  // ref. `null` = decision not resolved yet: until it is, the grip starts no
+  // drag. Once set: 'native' or 'compositor'.
 
   const edge: Edge = config && isEdge(config.dockEdge) ? config.dockEdge : 'top';
   const offset = config?.dockOffset ?? 0.5;
@@ -835,7 +835,7 @@ export function Widget() {
   }, [hovered, presenceRef]);
   // #180: drag strategy decision, fetched ONCE at mount (single fast
   // `get_wm_info` command). Two deterministic defaults, both recorded here:
-  // - While the decision is unresolved (`dragModeRef.current === null`) the
+  // - While the decision is unresolved (`currentDragMode() === null`) the
   //   grip does nothing: starting the old delta pipeline on a Wayland
   //   session is precisely the corruption this issue fixes, so the drag is
   //   BLOCKED instead of guessed. Detection is a fast startup command, so
@@ -843,6 +843,8 @@ export function Widget() {
   // - If detection fails, fall back to 'compositor': that behavior does NO
   //   harm — the compositor gesture cannot touch config.json, whereas the
   //   native pipeline could (see rationale in src/lib/drag-session.ts).
+  // - On unmount the store is cleared so a re-mounted widget re-detects
+  //   instead of inheriting a stale decision.
   useEffect(() => {
     let disposed = false;
     detectWindowManager()
@@ -851,13 +853,14 @@ export function Widget() {
         // `displayBackend` ships in the get_wm_info response (wm_compat.rs,
         // WU4 serde camelCase) and the TS mirror declares it typed now (WU5).
         // Detection failure still falls back to 'compositor' (catch below).
-        dragModeRef.current = dragMode(info.displayBackend).mode;
+        setDragMode(dragMode(info.displayBackend).mode);
       })
       .catch(() => {
-        if (!disposed) dragModeRef.current = 'compositor';
+        if (!disposed) setDragMode('compositor');
       });
     return () => {
       disposed = true;
+      resetDragMode();
     };
   }, []);
 
@@ -896,9 +899,10 @@ export function Widget() {
     if (e.button !== 0 || !geo || !dragMounted.current) return;
     // #180: until the startup decision is known the grip does nothing (see
     // the decision effect above for both defaults).
-    if (dragModeRef.current == null) return;
+    const mode = currentDragMode();
+    if (mode == null) return;
     e.preventDefault();
-    if (dragModeRef.current === 'compositor') {
+    if (mode === 'compositor') {
       // Compositor branch: the drag is delegated to the compositor via the
       // xdg-shell move gesture. startDragging() consumes the pointerdown
       // serial itself, so we set up no pointer capture and no `drag.current`
@@ -949,7 +953,7 @@ export function Widget() {
     // #180: in compositor mode the compositor moves the window during the
     // gesture, so this is a no-op — early return before any arithmetic or
     // rAF work. The native branch below keeps today's pipeline untouched.
-    if (dragModeRef.current === 'compositor') return;
+    if (currentDragMode() === 'compositor') return;
     const d = drag.current;
     if (!d?.start || d.ending || e.pointerId !== d.pointerId) return;
     const current = () => dragMounted.current && drag.current === d;
@@ -973,7 +977,7 @@ export function Widget() {
     // genuinely nothing else to release; a persisted edge computed from
     // untrustworthy coordinates would corrupt the config.json that X11
     // sessions also read.
-    if (dragModeRef.current === 'compositor') {
+    if (currentDragMode() === 'compositor') {
       setDragging(false);
       return;
     }
