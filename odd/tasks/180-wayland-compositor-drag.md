@@ -251,3 +251,11 @@ tests DOM diferidos (jsdom/happy-dom).
   de la descripción de la PR reemplazado por el comentario real de aprobación
   del alcance (6503078792). Verificación: typecheck 0; vitest 763/61; i18n
   regenerado al final (`c577e9a`).
+- [x] (4) Punto 4 del review cerrado (2026-10-29): nota de la superficie X11
+  sin los márgenes de #179 (resueltos por #205, nota viaja con referencia a
+  #205) y documentación de `GDK_BACKEND=x11` como alternativa XWayland en
+  `docs/build-linux.md` §6.1, con el aviso de colocar la variable en la
+  misma línea del comando o exportarla (commits `6f55ceb` + inventario
+  `b69c671`). Evidencia con capturas (4 bordes + aviso con contenedor
+  visible) publicada por el usuario en issue #180, comentario 6509379529.
+  Restante para integrar: force-push del fork (decisión del usuario).
