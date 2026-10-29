@@ -207,3 +207,13 @@ tests DOM diferidos (jsdom/happy-dom).
 - [x] (5) Descope: `odd/tasks/184-rustfmt-ci-format-gate.md` fuera de la PR
   (abandon de `review-27bd42743acae960` autorizado por el usuario y commit de
   remoción; review nativo relanzado sobre el candidato corregido).
+
+## Validación manual del usuario post-rebase (2026-10-29)
+
+- Drag y reposicionamiento funcionan tras el rebase (ambos modos probó el usuario).
+- Pila a la derecha con `GDK_BACKEND=x11`: el contenedor invisible traspasa hasta
+  la mitad de la pila — territorio preexistente #179/#205 (ventana 320×260 vs
+  tira), base-only, nunca introducido por esta rama.
+- Sin caja translúcida del contenedor en general; visible SOLO mientras se
+  muestra el aviso de API_KEY no aplicada para el proveedor detectado:
+  nota de evidencia concreta para las capturas pedidas (punto 4 del review).
