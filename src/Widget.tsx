@@ -26,7 +26,7 @@ import { clipSurfaceSafely, measureSurfaceClip } from './lib/surface-clip';
 import { peekRect, usesPeekWindow, waitForViewport, watchPreparation } from './lib/auto-hide';
 import { useDockReveal } from './lib/useDockReveal';
 import { dragMode, type DragMode } from './lib/drag-session';
-import { detectWindowManager, type WindowManagerInfo } from './lib/wm-detect';
+import { detectWindowManager } from './lib/wm-detect';
 import { t } from './i18n';
 import { localeFrom } from './i18n/use-locale';
 import { StripFallback } from './components/StripFallback';
@@ -848,14 +848,10 @@ export function Widget() {
     detectWindowManager()
       .then((info) => {
         if (disposed) return;
-        // `displayBackend` ships in the get_wm_info response in wm_compat.rs
-        // (WU4, serde camelCase), but the TS mirror in src/lib/wm-detect.ts
-        // does not declare it yet (WU5 will, with its Settings row), so read
-        // it defensively: anything other than the two known backends is
-        // treated as detection failure and falls back to 'compositor'.
-        const backend = (info as WindowManagerInfo & { displayBackend?: unknown }).displayBackend;
-        dragModeRef.current =
-          backend === 'x11' || backend === 'wayland' ? dragMode(backend).mode : 'compositor';
+        // `displayBackend` ships in the get_wm_info response (wm_compat.rs,
+        // WU4 serde camelCase) and the TS mirror declares it typed now (WU5).
+        // Detection failure still falls back to 'compositor' (catch below).
+        dragModeRef.current = dragMode(info.displayBackend).mode;
       })
       .catch(() => {
         if (!disposed) dragModeRef.current = 'compositor';
