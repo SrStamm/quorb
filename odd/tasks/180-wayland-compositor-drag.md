@@ -240,3 +240,14 @@ tests DOM diferidos (jsdom/happy-dom).
   typecheck 0 + vitest 762/61 verde (RED inaplicable — sin entorno DOM,
   decision jsdom/happy-dom sigue diferida al mantenedor); revalidación manual
   pendiente del usuario.
+- [x] Menores del review (2026-10-29, empleado test-first en el store puro):
+  (a) fallback por fallo de detección ahora Linux-only vía nueva
+  `fallbackDragMode(platform)` en `drag-session.ts` (RED→GREEN: 3 aserciones;
+  Windows/macOS conservan `native`/imán; Linux degrada a `compositor`), con
+  consumo en el catch del efecto de decisión de `Widget.tsx`; (b) doc block de
+  `dragMode()` reubicado sobre su función en `drag-session.ts`; (c) bloque de
+  comentario huérfano `#/#180: drag strategy…` eliminado de `Widget.tsx`
+  (la store ya vive en `drag-session.ts`); (d) link `issuecomment-*` literal
+  de la descripción de la PR reemplazado por el comentario real de aprobación
+  del alcance (6503078792). Verificación: typecheck 0; vitest 763/61; i18n
+  regenerado al final (`c577e9a`).
