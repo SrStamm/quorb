@@ -430,7 +430,7 @@ fn desktop_surfaces_by_session(
 /// compositor (`is_gnome`) solo refina la nota bajo Wayland.
 pub fn window_positioning_status(display_backend: DisplayBackend, is_gnome: bool) -> SurfaceStatus {
     match display_backend {
-        DisplayBackend::X11 => SurfaceStatus { state: "ok", note: "En X11 (y bajo XWayland con GDK_BACKEND=x11) el anclaje al borde y el arrastre con imán funcionan. Bajo XWayland pueden quedar márgenes en los bordes abajo/derecha (#179)." },
+        DisplayBackend::X11 => SurfaceStatus { state: "ok", note: "En X11 (y bajo XWayland con GDK_BACKEND=x11) el anclaje al borde y el arrastre con imán funcionan; la tira alcanza el borde del área de trabajo (#205)." },
         DisplayBackend::Wayland if is_gnome => SurfaceStatus { state: "limited", note: "Mutter no expone posicionamiento absoluto de ventanas (gtk_window_move no tiene efecto): el arrastre usa el gesto del compositor y, al soltar, no hay imán ni se persiste la posición." },
         DisplayBackend::Wayland => SurfaceStatus { state: "limited", note: "El posicionamiento absoluto de ventanas no está disponible bajo xdg-shell en Wayland: el arrastre de la tira se delega al compositor." },
     }
