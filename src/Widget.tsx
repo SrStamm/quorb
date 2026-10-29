@@ -660,6 +660,22 @@ export function Widget() {
     return () => { disposed = true; };
   }, [dragging, geo, autoHide, widgetQueue]);
 
+  // Safety net for the compositor drag (issue #180, maintainer review point
+  // 3): under the compositor's move grab the client may never receive the
+  // closing pointerup, which would leave `dragging` stuck true (detail panel
+  // blocked, auto-hide busy, placement not re-requested). A later buttonless
+  // pointermove is the reliable release signal the webview still sees after
+  // the grab ends. Compositor-only: the native branch owns its release
+  // pipeline in onGripUp and must not be bypassed.
+  useEffect(() => {
+    if (!dragging || currentDragMode() !== 'compositor') return;
+    const release = (e: { buttons: number }) => {
+      if (e.buttons === 0) setDragging(false);
+    };
+    window.addEventListener('pointermove', release);
+    return () => window.removeEventListener('pointermove', release);
+  }, [dragging]);
+
   // The detail window owns its dimensions; hovering never mutates widget geometry.
   useEffect(() => {
     const strip = geo && stripSize ? stripRect(geo.area, edge, offset, stripSize.w, stripSize.h) : null;
