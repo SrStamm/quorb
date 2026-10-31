@@ -1,5 +1,9 @@
 //! Contrato determinístico del ciclo de colocación del detalle (#215).
 //!
+//! Nota P2 (PR #224): mover la ventana con píxeles físicos tal cual duplica
+//! el desplazamiento a escala ×2; `position_call` es el seam que lo prueba
+//! sin GTK.
+//!
 //! El doble `Surface` modela al gestor de ventanas: la visibilidad la decide
 //! el frontend, el compositor contesta tarde, el permiso de resize está
 //! abierto **sólo** alrededor del resize programático dentro de la única
@@ -240,6 +244,54 @@ fn the_size_call_fixes_the_hints_before_resizing_and_closes_the_permission() {
         window.calls
     );
     assert!(!window.resizable, "no permission left open");
+}
+
+/// Doble para `Positioner` que registra cada movimiento, así la conversión
+/// de la petición física a lógica (`position_call`) es observable sin GTK.
+struct Mover {
+    scale: f64,
+    calls: Vec<(i32, i32)>,
+}
+
+impl Positioner for Mover {
+    fn scale(&self) -> f64 {
+        self.scale
+    }
+    fn move_to(&mut self, x: i32, y: i32) {
+        self.calls.push((x, y));
+    }
+}
+
+#[test]
+fn the_position_call_converts_both_axes_to_logical_at_scale_x2() {
+    // P2 de PR #224: `gtk.move_` espera píxeles LÓGICOS, la petición llega
+    // en píxeles físicos. A escala ×2 mover los valores físicos tal cual
+    // duplica el desplazamiento del panel: los dos ejes se convierten
+    // antes del movimiento.
+    let mut mover = Mover {
+        scale: 2.0,
+        calls: Vec::new(),
+    };
+    assert!(position_call(&mut mover, 200, 300));
+    assert_eq!(
+        mover.calls,
+        vec![(100, 150)],
+        "both axes convert with the window scale: {:?}",
+        mover.calls
+    );
+
+    // A escala 1:1 no cabe conversión: la petición física pasa tal cual.
+    let mut mover = Mover {
+        scale: 1.0,
+        calls: Vec::new(),
+    };
+    assert!(position_call(&mut mover, 200, 300));
+    assert_eq!(
+        mover.calls,
+        vec![(200, 300)],
+        "scale 1.0 is identity: {:?}",
+        mover.calls
+    );
 }
 
 #[test]

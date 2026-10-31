@@ -104,6 +104,28 @@ pub(crate) fn size_call<W: Sizable>(window: &mut W, width: i32, height: i32) -> 
     window.close_permission()
 }
 
+/// Ventana nativa abstracta para la llamada de posición, así la conversión
+/// de la petición a píxeles lógicos es testeable de forma determinística
+/// sin GTK (P2 de PR #224).
+pub(crate) trait Positioner {
+    /// El factor de escala de la propia ventana: GTK mide en píxeles
+    /// lógicos y la petición llega en píxeles físicos.
+    fn scale(&self) -> f64;
+    /// Mueve la ventana a coordenadas ya LÓGICAS.
+    fn move_to(&mut self, x: i32, y: i32);
+}
+
+/// La única llamada de posición en el hilo de UI (#215): la petición física
+/// se convierte a píxeles lógicos en **los dos ejes** antes del movimiento,
+/// porque GTK mide en píxeles lógicos (el mismo mapeo que hace el adaptador
+/// de widgets en `widget_placement.rs`). A escala ×2 mover los valores
+/// físicos tal cual duplicaría el desplazamiento del panel (P2 de PR #224).
+pub(crate) fn position_call<W: Positioner>(window: &mut W, x: i32, y: i32) -> bool {
+    let (lx, ly) = (to_logical(x, window.scale()), to_logical(y, window.scale()));
+    window.move_to(lx, ly);
+    true
+}
+
 /// Operaciones nativas que necesita el ciclo del detalle: la implementación
 /// real salta al hilo de UI y el doble de los tests responde en el acto.
 pub trait Surface {
@@ -336,6 +358,25 @@ where
     }
 }
 
+/// La contrapartida GTK del adaptador de posición: genérico como
+/// `GtkSizable`, así la llamada de posición sigue siendo testeable.
+#[cfg(target_os = "linux")]
+pub(crate) struct GtkPositioner<'a, W>(pub &'a W);
+
+#[cfg(target_os = "linux")]
+impl<W> Positioner for GtkPositioner<'_, W>
+where
+    W: gtk::prelude::GtkWindowExt + gtk::prelude::WidgetExt,
+{
+    fn scale(&self) -> f64 {
+        self.0.scale_factor() as f64
+    }
+
+    fn move_to(&mut self, x: i32, y: i32) {
+        self.0.move_(x, y);
+    }
+}
+
 /// La superficie GTK: todas las llamadas nativas ocurren en el hilo de UI.
 #[cfg(target_os = "linux")]
 struct UiSurface {
@@ -382,9 +423,12 @@ impl Surface for UiSurface {
             if superseded(generation) {
                 return true;
             }
-            use gtk::prelude::*;
-            gtk.move_(x, y);
-            true
+            // GTK mide en píxeles lógicos y la petición llega en píxeles
+            // físicos (P2 de PR #224): la conversión a los dos ejes va
+            // dentro de la única llamada de posición, con el factor de
+            // escala de la propia ventana, el mismo mapeo que el adaptador
+            // de widgets en `widget_placement.rs`.
+            position_call(&mut GtkPositioner(gtk), x, y)
         })
         .await
         .unwrap_or(false)
