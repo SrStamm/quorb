@@ -573,10 +573,12 @@ fn the_native_size_call_grants_the_size_and_leaves_no_permission_open() {
     assert!(!window.is_resizable(), "the permission stays closed");
 
     // La posición es explícita después del ciclo de tamaño: sin anclaje, sin
-    // resize.
-    window.move_(1859, 899);
+    // resize. Dentro del área útil: con una posición fuera de pantalla el
+    // gestor la reubica para que la ventana quepa y la petición no se
+    // reflejaría tal cual.
+    window.move_(100, 100);
     settle(400);
-    assert_eq!(window.position(), (1859, 899), "the position is applied");
+    assert_eq!(window.position(), (100, 100), "the position is applied");
 
     // El tamaño concedido sobrevive a la retirada del permiso.
     settle(700);
@@ -585,7 +587,7 @@ fn the_native_size_call_grants_the_size_and_leaves_no_permission_open() {
         (314, 379),
         "the size survives the permission withdrawal"
     );
-    assert_eq!(window.position(), (1859, 899));
+    assert_eq!(window.position(), (100, 100));
 }
 
 /// Le hace a GTK procesar eventos (la respuesta del gestor) durante `ms`.
